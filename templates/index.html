@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Disease Detection</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.5/cdn.min.js" defer></script>
+</head>
+<body class="bg-emerald-950 min-h-screen text-emerald-100">
+    <div class="container mx-auto px-4 py-12" x-data="plantApp()">
+        <div class="max-w-3xl mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-12">
+                <h1 class="text-4xl font-bold mb-4 text-amber-400">Plant Disease Detection</h1>
+                <p class="text-emerald-300">Upload or capture an image to detect plant health condition</p>
+            </div>
+            
+            <!-- Upload Form -->
+            <form id="upload-form" class="space-y-8 bg-emerald-900 p-8 rounded-xl shadow-2xl" @submit.prevent="submitForm">
+                <!-- Tab Navigation -->
+                <div class="flex rounded-lg overflow-hidden mb-6">
+                    <button 
+                        type="button" 
+                        class="flex-1 py-3 px-4 font-medium transition-colors focus:outline-none"
+                        :class="activeTab === 'upload' ? 'bg-amber-600 text-white' : 'bg-emerald-800 text-emerald-200 hover:bg-emerald-700'"
+                        @click="changeTab('upload')">
+                        Upload Image
+                    </button>
+                    <button 
+                        type="button" 
+                        class="flex-1 py-3 px-4 font-medium transition-colors focus:outline-none"
+                        :class="activeTab === 'camera' ? 'bg-amber-600 text-white' : 'bg-emerald-800 text-emerald-200 hover:bg-emerald-700'"
+                        @click="changeTab('camera')">
+                        Use Webcam
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <!-- Hidden file input -->
+                    <input type="file" 
+                           name="image" 
+                           id="fileInput"
+                           accept="image/*" 
+                           class="hidden"
+                           @change="handleFileUpload">
+                    
+                    <!-- File Upload Tab -->
+                    <div x-show="activeTab === 'upload'" class="relative border-2 border-dashed border-emerald-600 rounded-lg p-8 text-center hover:border-amber-400 transition-colors cursor-pointer"
+                         :class="{ 'border-amber-400': imageUrl }"
+                         @click="document.getElementById('fileInput').click()">
+                        <div class="space-y-2">
+                            <template x-if="!imageUrl">
+                                <div>
+                                    <svg class="mx-auto h-12 w-12 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                    <p class="mt-2 text-emerald-300">Click to upload an image</p>
+                                </div>
+                            </template>
+                            
+                            <template x-if="imageUrl">
+                                <div>
+                                    <img :src="imageUrl" class="mx-auto max-h-64 rounded-lg">
+                                    <p class="mt-2 text-emerald-300">Click to change image</p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    
+                    <!-- Webcam Tab -->
+                    <div x-show="activeTab === 'camera'" class="border-2 border-emerald-600 rounded-lg p-4 text-center space-y-4">
+                        <div class="relative bg-black rounded-lg overflow-hidden">
+                            <video id="camera" class="mx-auto max-h-64 w-full" autoplay playsinline></video>
+                        </div>
+                        
+                        <div class="flex space-x-2">
+                            <button type="button" 
+                                    class="flex-1 py-2 px-4 bg-amber-600 hover:bg-amber-700 rounded-lg font-medium text-white shadow-lg transition-colors"
+                                    @click="captureImage">
+                                Capture Image
+                            </button>
+                        </div>
+                        
+                        <template x-if="imageUrl && capturedFromCamera">
+                            <div class="mt-4">
+                                <p class="text-emerald-300 mb-2">Captured Image:</p>
+                                <img :src="imageUrl" class="mx-auto max-h-48 rounded-lg border border-amber-400">
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <button type="submit"
+                            class="w-full py-3 px-6 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold text-white shadow-lg transition-colors"
+                            :disabled="!imageUrl || loading">
+                        <template x-if="!loading">
+                            <span>Analyze Plant</span>
+                        </template>
+                        <template x-if="loading">
+                            <div class="flex items-center justify-center">
+                                <svg class="animate-spin h-5 w-5 mr-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Processing...</span>
+                            </div>
+                        </template>
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Result Section -->
+            <div class="mt-8">
+                <!-- Error Message -->
+                <template x-if="error">
+                    <div class="p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-200">
+                        <p x-text="error"></p>
+                    </div>
+                </template>
+                
+                <!-- Prediction Result -->
+                <template x-if="prediction">
+                    <div class="p-6 bg-emerald-900 rounded-xl shadow-2xl">
+                        <h2 class="text-xl font-semibold mb-4 text-amber-400">Analysis Result</h2>
+                        <div class="flex items-center justify-between p-4 bg-emerald-800/50 rounded-lg">
+                            <span class="text-emerald-200">Plant Condition:</span>
+                            <span x-text="prediction" 
+                                 :class="prediction === 'healthy' ? 'text-lg font-semibold text-green-400' : 'text-lg font-semibold text-red-400'">
+                            </span>
+                        </div>
+                        
+                        <div class="mt-4 p-4 bg-emerald-800/50 rounded-lg">
+                            <h3 class="text-lg font-medium mb-2 text-amber-400">Recommendation:</h3>
+                            <p x-show="prediction === 'healthy'" class="text-emerald-200">
+                                Your plant appears healthy! Continue with your current care routine and monitor regularly.
+                            </p>
+                            <p x-show="prediction === 'infected'" class="text-emerald-200">
+                                Your plant shows signs of infection. Consider isolating it from other plants and consult our disease guide for treatment options.
+                            </p>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function plantApp() {
+            return {
+                imageUrl: null,
+                prediction: null,
+                loading: false,
+                error: null,
+                activeTab: 'upload',
+                cameraStream: null,
+                capturedFromCamera: false,
+                capturedBlob: null,
+                
+                changeTab(tab) {
+                    this.activeTab = tab;
+                    if (tab === 'camera') {
+                        this.startCamera();
+                    } else {
+                        this.stopCamera();
+                    }
+                },
+                
+                handleFileUpload(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.imageUrl = URL.createObjectURL(file);
+                        this.capturedFromCamera = false;
+                        this.capturedBlob = null;
+                    }
+                },
+                
+                startCamera() {
+                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                        navigator.mediaDevices.getUserMedia({ video: true })
+                            .then(stream => {
+                                this.cameraStream = stream;
+                                const video = document.getElementById('camera');
+                                video.srcObject = stream;
+                                video.play();
+                            })
+                            .catch(err => {
+                                this.error = 'Could not access webcam: ' + err.message;
+                            });
+                    } else {
+                        this.error = 'Your browser does not support webcam access';
+                    }
+                },
+                
+                stopCamera() {
+                    if (this.cameraStream) {
+                        this.cameraStream.getTracks().forEach(track => {
+                            track.stop();
+                        });
+                        this.cameraStream = null;
+                    }
+                },
+                
+                captureImage() {
+                    const video = document.getElementById('camera');
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // Get blob
+                    canvas.toBlob(blob => {
+                        this.capturedBlob = blob;
+                        this.imageUrl = URL.createObjectURL(blob);
+                        this.capturedFromCamera = true;
+                    }, 'image/jpeg', 0.95);
+                },
+                
+                submitForm() {
+                    if (!this.imageUrl) {
+                        this.error = 'Please upload or capture an image first';
+                        return;
+                    }
+                    
+                    this.loading = true;
+                    this.error = null;
+                    this.prediction = null;
+                    
+                    const formData = new FormData();
+                    
+                    if (this.capturedFromCamera && this.capturedBlob) {
+                        // Use the captured blob from webcam
+                        formData.append('image', this.capturedBlob, 'capture.jpg');
+                    } else {
+                        // Use the file from file input
+                        const fileInput = document.getElementById('fileInput');
+                        if (fileInput.files.length > 0) {
+                            formData.append('image', fileInput.files[0]);
+                        } else {
+                            this.error = 'No image selected';
+                            this.loading = false;
+                            return;
+                        }
+                    }
+                    
+                    fetch('/predict', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            this.error = data.error;
+                        } else {
+                            this.prediction = data.prediction;
+                        }
+                    })
+                    .catch(err => {
+                        this.error = 'Failed to process image: ' + err.message;
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+                }
+            };
+        }
+    </script>
+</body>
+</html>
